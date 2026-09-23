@@ -1,0 +1,6 @@
+{
+  "name": "FarmPro AI - Quản Lý Trang Trại & Thú Y Thông Minh",
+  "description": "Nền tảng quản lý trang trại chăn nuôi toàn diện tích hợp AI Agent cố vấn thú y, lịch trình chăm sóc, quản lý đàn vật nuôi, chuồng trại và kho dược phẩm.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
