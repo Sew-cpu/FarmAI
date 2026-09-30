@@ -204,12 +204,12 @@ export const InventoryView: React.FC = () => {
 
       {/* Inventory Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredItems.map((item) => {
+        {filteredItems.map((item, index) => {
           const isLow = item.quantity <= item.minThreshold;
 
           return (
             <div
-              key={item.id}
+              key={`${item.id}-${index}`}
               className={`bg-white rounded-2xl border p-4 flex flex-col justify-between space-y-3 transition-all ${
                 isLow ? 'border-amber-300 shadow-xs bg-amber-50/20' : 'border-stone-200 shadow-xs'
               }`}

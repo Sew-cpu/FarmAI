@@ -45,6 +45,7 @@ interface FarmContextType {
 
   inventory: InventoryItem[];
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
+  addBatchInventoryItems: (items: Omit<InventoryItem, 'id'>[]) => void;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
   adjustInventoryStock: (id: string, amount: number) => void;
 
@@ -88,7 +89,21 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [inventory, setInventory] = useState<InventoryItem[]>(() => {
     const saved = localStorage.getItem('farmpro_inventory');
-    return saved ? JSON.parse(saved) : INITIAL_INVENTORY;
+    if (!saved) return INITIAL_INVENTORY;
+    try {
+      const parsed: InventoryItem[] = JSON.parse(saved);
+      const seenIds = new Set<string>();
+      return parsed.map((item, idx) => {
+        let itemId = item.id;
+        if (!itemId || seenIds.has(itemId)) {
+          itemId = `inv-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`;
+        }
+        seenIds.add(itemId);
+        return { ...item, id: itemId };
+      });
+    } catch {
+      return INITIAL_INVENTORY;
+    }
   });
 
   const [healthLogs, setHealthLogs] = useState<HealthLog[]>(() => {
@@ -254,9 +269,18 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addInventoryItem = (itemData: Omit<InventoryItem, 'id'>) => {
     const newItem: InventoryItem = {
       ...itemData,
-      id: `inv-${Date.now()}`,
+      id: `inv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     };
     setInventory((prev) => [...prev, newItem]);
+  };
+
+  const addBatchInventoryItems = (itemsData: Omit<InventoryItem, 'id'>[]) => {
+    const timestamp = Date.now();
+    const newItems: InventoryItem[] = itemsData.map((itemData, idx) => ({
+      ...itemData,
+      id: `inv-${timestamp}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+    }));
+    setInventory((prev) => [...prev, ...newItems]);
   };
 
   const updateInventoryItem = (id: string, fields: Partial<InventoryItem>) => {
@@ -334,6 +358,7 @@ Xin hãy đưa ra chẩn đoán nguyên nhân, phác đồ điều trị ban đ�
         addBatchTasks,
         inventory,
         addInventoryItem,
+        addBatchInventoryItems,
         updateInventoryItem,
         adjustInventoryStock,
         healthLogs,

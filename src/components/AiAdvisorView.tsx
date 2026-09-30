@@ -25,6 +25,7 @@ export const AiAdvisorView: React.FC = () => {
     tasks,
     inventory,
     addInventoryItem,
+    addBatchInventoryItems,
     addBatchTasks,
     setActiveTab,
     aiPromptPrefill,
@@ -258,14 +259,14 @@ export const AiAdvisorView: React.FC = () => {
     if (!trace?.decisionAgent?.data?.recommendedProducts) return;
     const products = trace.decisionAgent.data.recommendedProducts;
 
-    products.forEach((item: any) => {
+    const itemsToAdd = products.map((item: any) => {
       const p = item.product;
       let mappedCat: any = 'Thức ăn';
       if (p.category === 'Thuốc & Vắc xin') mappedCat = 'Thuốc & Vắc xin';
       else if (p.category === 'Thực phẩm bổ sung') mappedCat = 'Thực phẩm bổ sung';
       else if (p.category === 'Vật tư & Sát trùng') mappedCat = 'Vật tư chuồng trại';
 
-      addInventoryItem({
+      return {
         name: p.name,
         category: mappedCat,
         quantity: 10,
@@ -274,9 +275,10 @@ export const AiAdvisorView: React.FC = () => {
         costPerUnit: p.priceVnd || 0,
         supplier: p.brand,
         expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      });
+      };
     });
 
+    addBatchInventoryItems(itemsToAdd);
     setAppliedInventoryIndexes((prev) => [...prev, msgIndex]);
   };
 
