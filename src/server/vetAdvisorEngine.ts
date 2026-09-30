@@ -172,6 +172,40 @@ export function handleDirectFarmDataQuery(message: string, farmContext?: any): s
   const lowStockList: any[] = farmContext?.lowStockSupplies || DEFAULT_FARM_DATA.lowStockItems;
   const tasksList: any[] = farmContext?.pendingTasks || DEFAULT_FARM_DATA.pendingTasks;
 
+  // 0. QUERY VỀ THỜI GIAN THỰC (NGÀY, THÁNG, GIỜ HIỆN TẠI)
+  if (
+    q.match(/(hôm nay|bây giờ|hiện tại).*?(mấy giờ|ngày bao nhiêu|ngày mấy|thứ mấy|giờ rồi|mấy giờ rồi)/i) ||
+    q.includes('hôm nay là ngày bao nhiêu') ||
+    q.includes('hôm nay ngày bao nhiêu') ||
+    q.includes('bây giờ là mấy giờ') ||
+    q.includes('mấy giờ rồi') ||
+    q.includes('hôm nay là thứ mấy') ||
+    q === 'mấy giờ' ||
+    q === 'ngày mấy'
+  ) {
+    const now = new Date();
+    const vnTimeStr = now.toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
+    const vnDateStr = now.toLocaleDateString('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    return `⏰ **THÔNG TIN THỜI GIAN THỰC HIỆN TẠI:**
+
+- 🕒 **Giờ hiện tại:** **${vnTimeStr}** (Múi giờ Việt Nam GMT+7).
+- 📅 **Hôm nay là:** **${vnDateStr}**.
+
+---
+
+💡 **Giải thích về cơ sở dữ liệu:**
+Câu hỏi này **KHÔNG liên quan đến CSDL MySQL**.
+- **Thời gian hiện tại:** Được lấy trực tiếp từ **Đồng hồ hệ thống (System Runtime Clock / Realtime API)**.
+- **CSDL MySQL:** Dùng để lưu trữ dữ liệu có cấu trúc và lịch sử vận hành (hồ sơ 1,309 vật nuôi, 7 chuồng trại, 12 mặt hàng thuốc và lịch công việc). MySQL không lưu biến "bây giờ là mấy giờ" vì thời gian biến thiên liên tục theo từng giây.`;
+  }
+
   // 1. QUERY: CON NÀO BỊ BỆNH / ỐM / CÁCH LY / CẦN THEO DÕI
   if (
     q.match(/(con nào|vật nuôi nào|những con nào|đàn nào|có con nào|ai|con gì|danh sách).*?(bệnh|ốm|sốt|đau|cách ly|theo dõi|chăm sóc|vấn đề|triệu chứng)/i) ||
@@ -297,10 +331,11 @@ export function handleDirectFarmDataQuery(message: string, farmContext?: any): s
 
   // 5. QUERY VỀ LỊCH TRÌNH / CÔNG VIỆC CẦN LÀM HÔM NAY
   if (
-    q.match(/(việc|lịch|công việc|nhiệm vụ|hôm nay|cần làm).*?(làm gì|gì|nào|bao nhiêu)/i) ||
+    q.match(/(nhiệm vụ|công việc|lịch tiêm|lịch chăm sóc).*?(làm gì|hôm nay|cần làm)/i) ||
     q.includes('hôm nay làm gì') ||
     q.includes('việc cần làm') ||
-    q.includes('lịch tiêm phòng hôm nay')
+    q.includes('lịch tiêm phòng hôm nay') ||
+    q.includes('danh sách việc')
   ) {
     let res = `📋 **DANH SÁCH CÔNG VIỆC THÚ Y & CHĂM SÓC CẦN THỰC HIỆN HÔM NAY:**\n\n`;
     tasksList.forEach((t: string, i: number) => {
