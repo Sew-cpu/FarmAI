@@ -92,26 +92,76 @@ export const AiAdvisorView: React.FC = () => {
 
   // Construct current farm summary for AI context
   const getFarmContextPayload = () => {
+    const getBarnName = (barnId: string) => {
+      const b = barns.find((item) => item.id === barnId);
+      return b ? b.name : barnId;
+    };
+
+    const sickList = animals.filter((a) => a.status === 'sick' || a.status === 'isolated').map((a) => ({
+      tagId: a.tagId,
+      name: a.name,
+      species: a.species,
+      breed: a.breed,
+      weightKg: a.weightKg,
+      status: a.status === 'sick' ? 'Đang ốm (sick)' : 'Đang cách ly (isolated)',
+      barn: getBarnName(a.barnId),
+      notes: a.notes || 'Không có ghi chú',
+      lastCheckup: a.lastCheckupDate || 'Chưa cập nhật',
+    }));
+
+    const monitoringList = animals.filter((a) => a.status === 'monitoring').map((a) => ({
+      tagId: a.tagId,
+      name: a.name,
+      species: a.species,
+      breed: a.breed,
+      weightKg: a.weightKg,
+      status: 'Cần theo dõi (monitoring)',
+      barn: getBarnName(a.barnId),
+      notes: a.notes || 'Không có ghi chú',
+      lastCheckup: a.lastCheckupDate || 'Chưa cập nhật',
+    }));
+
     return {
       totalAnimals: animals.length,
-      animalsSummary: animals.map((a) => ({
-        tag: a.tagId,
+      quickStats: {
+        totalAnimals: animals.length,
+        sickCount: sickList.length,
+        monitoringCount: monitoringList.length,
+        totalBarns: barns.length,
+        lowStockCount: inventory.filter((i) => i.quantity <= i.minThreshold).length,
+        pendingTasksCount: tasks.filter((t) => t.status === 'pending').length,
+      },
+      sickAnimals: sickList,
+      monitoringAnimals: monitoringList,
+      allAnimals: animals.map((a) => ({
+        tagId: a.tagId,
+        name: a.name,
         species: a.species,
         breed: a.breed,
-        weight: a.weightKg,
+        weightKg: a.weightKg,
         status: a.status,
+        barn: getBarnName(a.barnId),
         notes: a.notes,
+        lastCheckup: a.lastCheckupDate,
+        vaccines: a.vaccinationHistory?.map((v) => `${v.vaccineName} (${v.date})`).join(', ') || 'Chưa có',
       })),
-      sickAnimals: animals.filter((a) => a.status === 'sick' || a.status === 'isolated'),
       barnsSummary: barns.map((b) => ({
         name: b.name,
         species: b.species,
         count: b.currentCount,
+        capacity: b.capacity,
         temp: b.temperature,
         humidity: b.humidity,
         cleanliness: b.cleanliness,
+        lastSanitized: b.lastSanitized,
       })),
-      lowStockSupplies: inventory.filter((i) => i.quantity <= i.minThreshold).map((i) => i.name),
+      lowStockSupplies: inventory
+        .filter((i) => i.quantity <= i.minThreshold)
+        .map((i) => `${i.name} (còn ${i.quantity} ${i.unit}, định mức ${i.minThreshold} ${i.unit})`),
+      pendingTasks: tasks
+        .filter((t) => t.status === 'pending')
+        .slice(0, 5)
+        .map((t) => `[${t.priority}] ${t.title} (hạn: ${t.dueDate})`),
     };
   };
 

@@ -8,6 +8,50 @@ import os
 import pymysql
 from config import Config
 
+def split_sql_statements(sql_text: str):
+    """Safely split SQL statements by semicolon, ignoring semicolons within quotes."""
+    statements = []
+    current = []
+    in_single_quote = False
+    in_double_quote = False
+    escape = False
+
+    for char in sql_text:
+        if escape:
+            current.append(char)
+            escape = False
+            continue
+
+        if char == '\\':
+            escape = True
+            current.append(char)
+            continue
+
+        if char == "'" and not in_double_quote:
+            in_single_quote = not in_single_quote
+            current.append(char)
+            continue
+
+        if char == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+            current.append(char)
+            continue
+
+        if char == ';' and not in_single_quote and not in_double_quote:
+            stmt = "".join(current).strip()
+            if stmt:
+                statements.append(stmt)
+            current = []
+            continue
+
+        current.append(char)
+
+    last_stmt = "".join(current).strip()
+    if last_stmt:
+        statements.append(last_stmt)
+
+    return statements
+
 def init_mysql_database():
     print(f"🔄 Đang kết nối tới máy chủ MySQL tại {Config.DB_HOST}:{Config.DB_PORT}...")
     
@@ -46,8 +90,8 @@ def init_mysql_database():
         with open(schema_path, "r", encoding="utf-8") as f:
             sql_script = f.read()
 
-        # Split statements by semicolon
-        statements = sql_script.split(";")
+        # Safely split statements by semicolon outside quotes
+        statements = split_sql_statements(sql_script)
         with conn.cursor() as cur:
             for stmt in statements:
                 stmt_clean = stmt.strip()
