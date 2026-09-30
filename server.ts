@@ -7,6 +7,16 @@ import {
   getAiSchedulePlan,
   getAiDiagnosisResult,
 } from './src/server/vetAdvisorEngine.ts';
+import {
+  executeMultiAgentPipeline,
+  PRODUCT_CATALOG,
+  KNOWN_BRANDS,
+} from './src/server/multiAgentSystem.ts';
+import {
+  TEST_CASES,
+  runSingleTestCase,
+} from './src/server/multiAgentTestCases.ts';
+import { checkDbConnection, fetchAllProducts } from './src/server/db.ts';
 
 dotenv.config();
 
@@ -56,7 +66,7 @@ app.post('/api/ai/diagnose', async (req: Request, res: Response) => {
   try {
     const {
       species = 'Gia súc',
-      symptoms = 'Sốt, mệt mỏi',
+      symptoms = 'Bất thường',
       fever = true,
       appetite = 'Kém ăn',
       days = '1-2 ngày',
@@ -69,6 +79,103 @@ app.post('/api/ai/diagnose', async (req: Request, res: Response) => {
     console.error('Error in /api/ai/diagnose:', error);
     const triage = await getAiDiagnosisResult('Gia súc', 'Bất thường', true, 'Kém ăn', '1 ngày', '1 con');
     return res.json(triage);
+  }
+});
+
+// ========================================================
+// MULTI-AGENT SYSTEM API ENDPOINTS (TC01 - TC10)
+// ========================================================
+
+// 1. Run live Multi-Agent consultation pipeline
+app.post('/api/ai/multi-agent/run', async (req: Request, res: Response) => {
+  try {
+    const { query, testCaseTag } = req.body;
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({ error: 'Nội dung yêu cầu không được để trống' });
+    }
+
+    const trace = await executeMultiAgentPipeline(query.trim(), testCaseTag);
+    return res.json(trace);
+  } catch (error: any) {
+    console.error('Error in /api/ai/multi-agent/run:', error);
+    return res.status(500).json({ error: error.message || 'Lỗi xử lý Multi-Agent System' });
+  }
+});
+
+// 2. Get Product Catalog & Brands for Multi-Agent (From MySQL or fallback)
+app.get('/api/ai/multi-agent/catalog', async (_req: Request, res: Response) => {
+  try {
+    const products = await fetchAllProducts();
+    return res.json({
+      products,
+      brands: KNOWN_BRANDS,
+      totalProducts: products.length,
+    });
+  } catch (error: any) {
+    return res.json({
+      products: PRODUCT_CATALOG,
+      brands: KNOWN_BRANDS,
+      totalProducts: PRODUCT_CATALOG.length,
+    });
+  }
+});
+
+// Database Health & Connection Status Endpoint
+app.get('/api/db/status', async (_req: Request, res: Response) => {
+  try {
+    const status = await checkDbConnection();
+    return res.json(status);
+  } catch (error: any) {
+    return res.json({
+      connected: false,
+      mode: 'in_memory_simulation',
+      message: 'Đang chạy ở chế độ In-memory simulation',
+    });
+  }
+});
+
+// 3. Get Test Cases List (TC01 - TC10)
+app.get('/api/ai/multi-agent/test-cases', (_req: Request, res: Response) => {
+  return res.json({ testCases: TEST_CASES });
+});
+
+// 4. Run Single Test Case (e.g. TC01, TC03, TC08, etc.)
+app.post('/api/ai/multi-agent/run-test-case', async (req: Request, res: Response) => {
+  try {
+    const { testCaseId } = req.body;
+    if (!testCaseId) {
+      return res.status(400).json({ error: 'Thiếu mã kiểm thử testCaseId (TC01 - TC10)' });
+    }
+
+    const result = await runSingleTestCase(testCaseId);
+    return res.json(result);
+  } catch (error: any) {
+    console.error('Error running test case:', error);
+    return res.status(500).json({ error: error.message || 'Lỗi thực thi test case' });
+  }
+});
+
+// 5. Run All Test Cases (TC01 to TC10) in batch
+app.post('/api/ai/multi-agent/run-all-tests', async (_req: Request, res: Response) => {
+  try {
+    const results = [];
+    for (const tc of TEST_CASES) {
+      const resSingle = await runSingleTestCase(tc.id);
+      results.push(resSingle);
+    }
+    const passedCount = results.filter((r) => r.overallPassed).length;
+    return res.json({
+      summary: {
+        total: results.length,
+        passed: passedCount,
+        failed: results.length - passedCount,
+        passRatePercentage: Math.round((passedCount / results.length) * 100),
+      },
+      results,
+    });
+  } catch (error: any) {
+    console.error('Error running all test cases:', error);
+    return res.status(500).json({ error: error.message || 'Lỗi chạy bộ kiểm thử toàn diện' });
   }
 });
 

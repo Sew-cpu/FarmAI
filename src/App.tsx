@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
 import { AnimalsView } from './components/AnimalsView';
 import { AiAdvisorView } from './components/AiAdvisorView';
+import { MultiAgentView } from './components/MultiAgentView';
 import { ScheduleView } from './components/ScheduleView';
 import { BarnsView } from './components/BarnsView';
 import { InventoryView } from './components/InventoryView';
@@ -40,6 +41,7 @@ function MainApp() {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
           {activeTab === 'dashboard' && <DashboardView />}
           {activeTab === 'animals' && <AnimalsView />}
+          {activeTab === 'multi-agent' && <MultiAgentView />}
           {activeTab === 'ai-advisor' && <AiAdvisorView />}
           {activeTab === 'schedule' && <ScheduleView />}
           {activeTab === 'barns' && <BarnsView />}

@@ -16,6 +16,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useFarm } from '../context/FarmContext';
+import { MultiAgentView } from './MultiAgentView';
 
 export const AiAdvisorView: React.FC = () => {
   const {
@@ -23,19 +24,26 @@ export const AiAdvisorView: React.FC = () => {
     barns,
     tasks,
     inventory,
+    addInventoryItem,
     addBatchTasks,
     setActiveTab,
     aiPromptPrefill,
     setAiPromptPrefill,
   } = useFarm();
 
-  const [activeSubTab, setActiveSubTab] = useState<'chat' | 'scheduler' | 'diagnose'>('chat');
+  const [activeSubTab, setActiveSubTab] = useState<'chat' | 'multi-agent' | 'scheduler' | 'diagnose'>('chat');
 
   // Chat state
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'model'; text: string; time: string }>>([
+  const [chatMode, setChatMode] = useState<'multi-agent' | 'clinical'>('clinical');
+  const [messages, setMessages] = useState<Array<{
+    role: 'user' | 'model';
+    text: string;
+    time: string;
+    trace?: any;
+  }>>([
     {
       role: 'model',
-      text: `Xin chào! Tôi là **AgroVet AI** - Trợ lý Thú Y & Quản Lý Trang Trại Nông Nghiệp Thông Minh.\n\nTôi có thể giúp bạn:\n- 🩺 **Chẩn đoán sơ bộ** triệu chứng bệnh ở gia súc, gia cầm (Bò, Heo, Gà, Dê...)\n- 📅 **Lập lịch tiêm phòng** vắc xin, tẩy giun sán và chăm sóc định kỳ\n- 🌾 **Tư vấn dinh dưỡng**, phối trộn thức ăn và cân bằng khẩu phần\n- 🧼 **Quy trình an toàn sinh học**, khử trùng chuồng trại và xử lý môi trường\n\nBạn đang quan tâm đến vấn đề gì hôm nay?`,
+      text: `👋 **Xin chào bạn! Tôi là AgroVet AI - Cố vấn Thú Y & Chăn Nuôi Trang Trại.**\n\nTôi sẵn sàng trò chuyện và giải đáp mọi câu hỏi của bạn:\n- 🩺 **Chẩn đoán bệnh & Phác đồ điều trị:** Bò chướng hơi dạ cỏ, sốt sữa, viêm vú; heo sốt đỏ, tiêu chảy; gà hen khẹc, cầu trùng...\n- 🌾 **Dinh dưỡng & Vỗ béo:** Cám vỗ béo bò thịt, khoáng premix, công thức phối trộn thức ăn tinh, ủ chua cỏ voi.\n- 📅 **Lịch tiêm phòng & Vắc xin:** Lịch tiêm phòng đầy đủ theo lứa tuổi gia súc, gia cầm.\n- 🧼 **An toàn sinh học & Vệ sinh chuồng trại:** Kỹ thuật phun sát trùng, đệm lót sinh học, khử mùi hôi amoniac.\n\n👉 *Bạn đang muốn hỏi về vấn đề gì hoặc cần tư vấn đàn vật nuôi nào? Hãy nhắn cho tôi nhé!*`,
       time: 'Vừa xong',
     },
   ]);
@@ -43,6 +51,8 @@ export const AiAdvisorView: React.FC = () => {
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [includeFarmContext, setIncludeFarmContext] = useState(true);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [appliedInventoryIndexes, setAppliedInventoryIndexes] = useState<number[]>([]);
+  const [appliedScheduleIndexes, setAppliedScheduleIndexes] = useState<number[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -131,30 +141,53 @@ export const AiAdvisorView: React.FC = () => {
     setIsLoadingChat(true);
 
     try {
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: query,
-          history: messages.slice(-6).map((m) => ({ role: m.role, text: m.text })),
-          farmContext: includeFarmContext ? getFarmContextPayload() : undefined,
-        }),
-      });
+      if (chatMode === 'multi-agent') {
+        const response = await fetch('/api/ai/multi-agent/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+        });
 
-      const data = await response.json();
+        const trace = await response.json();
+        if (!response.ok) throw new Error(trace.error || 'Lỗi xử lý Multi-Agent System');
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Lỗi kết nối máy chủ AI');
+        const dec = trace.decisionAgent?.data;
+        const protocolText = dec?.clinicalProtocol ? dec.clinicalProtocol.join('\n\n') : '';
+        const warningsText = dec?.safetyWarnings ? dec.safetyWarnings.join('\n') : '';
+        const summaryText = `${dec?.summary || 'Đã phân tích xong yêu cầu qua 4 tác tử.'}\n\n📋 **Phác đồ can thiệp 4 bước:**\n${protocolText}\n\n${warningsText}`;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'model',
+            text: summaryText,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            trace,
+          },
+        ]);
+      } else {
+        const response = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: query,
+            history: messages.slice(-6).map((m) => ({ role: m.role, text: m.text })),
+            farmContext: includeFarmContext ? getFarmContextPayload() : undefined,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Lỗi kết nối máy chủ AI');
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'model',
+            text: data.text || 'Tôi đã nhận thông tin nhưng chưa thể tạo câu trả lời chi tiết. Xin hãy thử lại.',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'model',
-          text: data.text || 'Tôi đã nhận thông tin nhưng chưa thể tạo câu trả lời chi tiết. Xin hãy thử lại.',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
     } catch (err: any) {
       console.error(err);
       setMessages((prev) => [
@@ -168,6 +201,59 @@ export const AiAdvisorView: React.FC = () => {
     } finally {
       setIsLoadingChat(false);
     }
+  };
+
+  // Add products from chat trace to farm inventory
+  const handleChatAddInventory = (trace: any, msgIndex: number) => {
+    if (!trace?.decisionAgent?.data?.recommendedProducts) return;
+    const products = trace.decisionAgent.data.recommendedProducts;
+
+    products.forEach((item: any) => {
+      const p = item.product;
+      let mappedCat: any = 'Thức ăn';
+      if (p.category === 'Thuốc & Vắc xin') mappedCat = 'Thuốc & Vắc xin';
+      else if (p.category === 'Thực phẩm bổ sung') mappedCat = 'Thực phẩm bổ sung';
+      else if (p.category === 'Vật tư & Sát trùng') mappedCat = 'Vật tư chuồng trại';
+
+      addInventoryItem({
+        name: p.name,
+        category: mappedCat,
+        quantity: 10,
+        unit: p.unit || 'Đơn vị',
+        minThreshold: 3,
+        costPerUnit: p.priceVnd || 0,
+        supplier: p.brand,
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      });
+    });
+
+    setAppliedInventoryIndexes((prev) => [...prev, msgIndex]);
+  };
+
+  // Add tasks from chat trace to farm schedule
+  const handleChatAddSchedule = (trace: any, msgIndex: number) => {
+    if (!trace?.decisionAgent?.data?.clinicalProtocol) return;
+    const protocols = trace.decisionAgent.data.clinicalProtocol;
+    const today = new Date();
+
+    const formattedTasks = protocols.map((proto: string, idx: number) => {
+      const taskDate = new Date();
+      taskDate.setDate(today.getDate() + idx + 1);
+      const dateString = taskDate.toISOString().split('T')[0];
+
+      return {
+        title: `Phác đồ MAS: ${proto.slice(0, 45)}...`,
+        category: (idx === 0 ? 'Kiểm tra sức khỏe' : idx === 1 ? 'Vắc xin' : 'Vệ sinh chuồng') as any,
+        dueDate: dateString,
+        priority: (idx === 0 || idx === 1 ? 'Khẩn cấp' : 'Cao') as any,
+        status: 'pending' as const,
+        notes: proto,
+        isAiGenerated: true,
+      };
+    });
+
+    addBatchTasks(formattedTasks);
+    setAppliedScheduleIndexes((prev) => [...prev, msgIndex]);
   };
 
   // Generate schedule via AI
@@ -280,12 +366,27 @@ export const AiAdvisorView: React.FC = () => {
               onClick={() => setActiveSubTab('chat')}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
                 activeSubTab === 'chat'
-                  ? 'bg-white text-emerald-900 shadow-md'
-                  : 'bg-white/15 text-white hover:bg-white/25'
+                  ? 'bg-white text-emerald-950 shadow-md ring-2 ring-emerald-300'
+                  : 'bg-emerald-500/30 text-white hover:bg-emerald-500/40 border border-emerald-400/30'
               }`}
             >
-              <Bot className="w-4 h-4" />
-              Tư Vấn Thú Y Trực Tuyến
+              <Bot className="w-4 h-4 text-emerald-300" />
+              <span>Tư Vấn Thú Y Trực Tuyến</span>
+            </button>
+
+            <button
+              onClick={() => setActiveSubTab('multi-agent')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                activeSubTab === 'multi-agent'
+                  ? 'bg-white text-emerald-950 shadow-md ring-2 ring-emerald-300'
+                  : 'bg-emerald-500/30 text-white hover:bg-emerald-500/40 border border-emerald-400/30'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-emerald-300" />
+              <span>Hệ Thống Đa Tác Tử (TC01-TC10)</span>
+              <span className="px-1.5 py-0.2 text-[10px] bg-emerald-400 text-emerald-950 font-extrabold rounded-md">
+                Chuẩn Thử Nghiệm
+              </span>
             </button>
 
             <button
@@ -315,16 +416,46 @@ export const AiAdvisorView: React.FC = () => {
         </div>
       </div>
 
-      {/* Sub Tab 1: Chat Consultation */}
+      {/* Sub Tab 1: Chat Consultation (Tư Vấn Thú Y Trực Tuyến) */}
       {activeSubTab === 'chat' && (
         <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden flex flex-col h-[650px]">
           {/* Chat Header Bar */}
-          <div className="px-6 py-3.5 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-bold text-stone-800">Bác sĩ Thú Y AI Trực Tuyến</span>
-              <span className="text-stone-400">|</span>
-              <span className="text-stone-500">Mô hình: Gemini 3.8 Flash</span>
+          <div className="px-6 py-3 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-bold text-stone-800">Cố Vấn AI Trực Tuyến</span>
+              </div>
+
+              {/* Mode Toggle Switcher */}
+              <div className="flex items-center gap-1 p-0.5 bg-stone-200/80 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setChatMode('multi-agent')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    chatMode === 'multi-agent'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                  title="Chế độ phân tích phối hợp 4 Agent theo chuẩn TC01-TC10"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Đa Tác Tử (MAS)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatMode('clinical')}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    chatMode === 'clinical'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                  title="Chế độ tư vấn lâm sàng trực tiếp"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>Bác Sĩ Lâm Sàng</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -336,7 +467,7 @@ export const AiAdvisorView: React.FC = () => {
                   className="rounded text-emerald-600 focus:ring-emerald-500"
                 />
                 <span className="text-xs font-medium">
-                  Đính kèm dữ liệu thực tế trang trại ({animals.length} con, {barns.length} chuồng)
+                  Đính kèm dữ liệu trang trại ({animals.length} con, {barns.length} chuồng)
                 </span>
               </label>
 
@@ -379,6 +510,10 @@ export const AiAdvisorView: React.FC = () => {
           <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-stone-50/40">
             {messages.map((msg, index) => {
               const isAi = msg.role === 'model';
+              const hasTrace = !!msg.trace;
+              const isInventoryAdded = appliedInventoryIndexes.includes(index);
+              const isScheduleAdded = appliedScheduleIndexes.includes(index);
+
               return (
                 <div
                   key={index}
@@ -396,7 +531,7 @@ export const AiAdvisorView: React.FC = () => {
                     {isAi ? <Bot className="w-4 h-4" /> : 'Tôi'}
                   </div>
 
-                  <div className="group relative">
+                  <div className="group relative w-full">
                     <div
                       className={`p-4 rounded-2xl shadow-xs whitespace-pre-wrap ${
                         isAi
@@ -405,6 +540,143 @@ export const AiAdvisorView: React.FC = () => {
                       }`}
                     >
                       {msg.text}
+
+                      {/* Interactive Multi-Agent Trace Details Card */}
+                      {hasTrace && msg.trace?.decisionAgent?.data?.recommendedProducts && (
+                        <div className="mt-4 pt-4 border-t border-stone-100 space-y-3">
+                          {/* 4 Agent Pipeline Badges */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                            <div className="p-2 rounded-xl bg-blue-50 border border-blue-200/60 text-blue-900">
+                              <div className="font-bold flex items-center gap-1 text-[10px] text-blue-700 uppercase">
+                                <span>🎯 1. Yêu Cầu</span>
+                              </div>
+                              <div className="font-semibold mt-0.5 truncate">
+                                {msg.trace.requirementAgent?.data?.target_species || 'Vật nuôi'}
+                              </div>
+                              <div className="text-[10px] text-blue-600 truncate">
+                                {msg.trace.requirementAgent?.data?.brand_preference || 'Mọi hãng'}
+                              </div>
+                            </div>
+
+                            <div className="p-2 rounded-xl bg-purple-50 border border-purple-200/60 text-purple-900">
+                              <div className="font-bold flex items-center gap-1 text-[10px] text-purple-700 uppercase">
+                                <span>🔍 2. Tra Cứu</span>
+                              </div>
+                              <div className="font-semibold mt-0.5 truncate">SQL An Toàn</div>
+                              <div className="text-[10px] text-purple-600 truncate">
+                                Độ khớp:{' '}
+                                {(
+                                  (msg.trace.searchAgent?.data?.semanticVectorHits?.[0]?.similarityScore || 0) * 100
+                                ).toFixed(0)}
+                                %
+                              </div>
+                            </div>
+
+                            <div className="p-2 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-900">
+                              <div className="font-bold flex items-center gap-1 text-[10px] text-amber-700 uppercase">
+                                <span>⚖️ 3. Thẩm Định</span>
+                              </div>
+                              <div className="font-semibold mt-0.5">
+                                {msg.trace.criticAgent?.data?.score || 90}/100
+                              </div>
+                              <div className="text-[10px] text-amber-600">
+                                Thử lại: {msg.trace.criticAgent?.data?.retryCount || 0} lần
+                              </div>
+                            </div>
+
+                            <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200/60 text-emerald-900">
+                              <div className="font-bold flex items-center gap-1 text-[10px] text-emerald-700 uppercase">
+                                <span>📋 4. Quyết Định</span>
+                              </div>
+                              <div className="font-semibold mt-0.5 truncate">
+                                {msg.trace.decisionAgent?.data?.recommendedProducts?.length || 0} sản phẩm
+                              </div>
+                              <div className="text-[10px] text-emerald-600">
+                                {(msg.trace.decisionAgent?.data?.totalCostVnd || 0).toLocaleString('vi-VN')} đ
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Recommended Products Mini Cards */}
+                          <div className="space-y-2 mt-2">
+                            <div className="text-[11px] font-bold text-stone-700">
+                              Sản phẩm chỉ định trong đơn:
+                            </div>
+                            {msg.trace.decisionAgent.data.recommendedProducts.map(
+                              (item: any, pIdx: number) => (
+                                <div
+                                  key={pIdx}
+                                  className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 flex items-center justify-between gap-3 text-xs"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-stone-900 truncate">
+                                      {item.product.name}
+                                    </div>
+                                    <div className="text-[11px] text-stone-500 flex items-center gap-2">
+                                      <span className="font-semibold text-emerald-700">
+                                        {item.product.brand}
+                                      </span>
+                                      <span>•</span>
+                                      <span>{item.dosageGuide}</span>
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <div className="font-extrabold text-stone-900">
+                                      {item.product.priceVnd.toLocaleString('vi-VN')} đ
+                                    </div>
+                                    <div className="text-[10px] text-stone-400">
+                                      {item.product.unit}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+
+                          {/* Action Buttons to Farm */}
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                              onClick={() => handleChatAddInventory(msg.trace, index)}
+                              disabled={isInventoryAdded}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                                isInventoryAdded
+                                  ? 'bg-emerald-100 text-emerald-800 cursor-default'
+                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                              }`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>
+                                {isInventoryAdded ? 'Đã thêm vào Kho FarmPro' : 'Thêm vào Kho Vật Tư'}
+                              </span>
+                            </button>
+
+                            <button
+                              onClick={() => handleChatAddSchedule(msg.trace, index)}
+                              disabled={isScheduleAdded}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                                isScheduleAdded
+                                  ? 'bg-blue-100 text-blue-800 cursor-default'
+                                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
+                              }`}
+                            >
+                              <Calendar className="w-3.5 h-3.5" />
+                              <span>
+                                {isScheduleAdded
+                                  ? 'Đã lập lịch chăm sóc'
+                                  : 'Lập lịch phác đồ chăm sóc'}
+                              </span>
+                            </button>
+
+                            <button
+                              onClick={() => setActiveSubTab('multi-agent')}
+                              className="px-3 py-1.5 rounded-xl text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-stone-200 flex items-center gap-1 ml-auto"
+                            >
+                              <span>Mở giao diện MAS</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div
@@ -476,7 +748,10 @@ export const AiAdvisorView: React.FC = () => {
         </div>
       )}
 
-      {/* Sub Tab 2: AI Schedule Generator */}
+      {/* Sub Tab 2: Multi-Agent System (Hệ Thống Đa Tác Tử) */}
+      {activeSubTab === 'multi-agent' && <MultiAgentView />}
+
+      {/* Sub Tab 3: AI Schedule Generator */}
       {activeSubTab === 'scheduler' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Form */}

@@ -42,11 +42,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
     },
     {
       id: 'ai-advisor',
-      label: 'AgroVet AI Cố vấn',
+      label: 'Tư Vấn Thú Y (Bác Sĩ AI)',
       icon: Bot,
       highlight: true,
       badge: 'Trợ lý AI',
       badgeColor: 'bg-emerald-500 text-white font-bold',
+    },
+    {
+      id: 'multi-agent',
+      label: 'Hệ Thống Đa Tác Tử',
+      icon: Sparkles,
+      highlight: true,
+      badge: 'TC01-TC10',
+      badgeColor: 'bg-emerald-600 text-white font-bold',
     },
     {
       id: 'schedule',
