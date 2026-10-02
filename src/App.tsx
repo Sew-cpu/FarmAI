@@ -30,7 +30,7 @@ function MainApp() {
       />
 
       {/* Main Body */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto items-start">
         {/* Sidebar */}
         <Sidebar
           mobileOpen={mobileSidebarOpen}
@@ -38,7 +38,7 @@ function MainApp() {
         />
 
         {/* Dynamic Content View */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
           {activeTab === 'dashboard' && <DashboardView />}
           {activeTab === 'animals' && <AnimalsView />}
           {activeTab === 'multi-agent' && <MultiAgentView />}
