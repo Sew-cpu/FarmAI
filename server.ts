@@ -1,7 +1,8 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
 import {
   getVetChatResponse,
   getAiSchedulePlan,
@@ -17,8 +18,6 @@ import {
   runSingleTestCase,
 } from './src/server/multiAgentTestCases.ts';
 import { checkDbConnection, fetchAllProducts } from './src/server/db.ts';
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -181,15 +180,38 @@ app.post('/api/ai/multi-agent/run-all-tests', async (_req: Request, res: Respons
 
 // Vite middleware in dev or static files in prod
 async function startServer() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const distHtmlPath = path.resolve(__dirname, 'dist', 'index.html');
+  const hasDist = fs.existsSync(distHtmlPath);
+  const isProd = process.env.NODE_ENV === 'production' || hasDist;
 
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      root: __dirname,
+      configFile: path.resolve(__dirname, 'vite.config.ts'),
+      server: {
+        middlewareMode: true,
+        watch: null,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
+
+    // Fallback: Ensure GET * always transforms and serves index.html in dev mode
+    app.use('*', async (req: Request, res: Response, next) => {
+      const url = req.originalUrl;
+      if (url.startsWith('/api')) {
+        return next();
+      }
+      try {
+        const indexHtmlPath = path.resolve(__dirname, 'index.html');
+        let template = fs.readFileSync(indexHtmlPath, 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (err) {
+        next(err);
+      }
+    });
   } else {
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (_req: Request, res: Response) => {

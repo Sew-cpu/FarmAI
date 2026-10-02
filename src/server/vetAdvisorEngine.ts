@@ -3,15 +3,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+// Initialize Gemini Client lazily to prevent startup warnings if key is unset
+const getAi = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim() || apiKey.startsWith('AQ.')) {
+    return null;
+  }
+  return new GoogleGenAI({
+    apiKey: apiKey.trim(),
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
     },
-  },
-});
+  });
+};
 
 // Helper to race promise with timeout
 const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
@@ -539,8 +545,11 @@ Nguyên tắc phản hồi:
         },
       ];
 
+      const aiClient = getAi();
+      if (!aiClient) break;
+
       const response = await withTimeout(
-        ai.models.generateContent({
+        aiClient.models.generateContent({
           model: modelName,
           contents,
           config: {
@@ -953,8 +962,11 @@ export async function getAiSchedulePlan(
   const prompt = `Lập lịch chăm sóc thú y chuẩn: loài ${species}, giai đoạn ${stage}, ghi chú ${targetNotes}. Trả về JSON với summary và mảng tasks.`;
 
   try {
+    const aiClient = getAi();
+    if (!aiClient) throw new Error('No AI client');
+
     const response = await withTimeout(
-      ai.models.generateContent({
+      aiClient.models.generateContent({
         model: 'gemini-3.8-flash',
         contents: prompt,
         config: {
@@ -1140,8 +1152,11 @@ export async function getAiDiagnosisResult(
   const prompt = `Chẩn đoán bệnh thú y: loài ${species}, triệu chứng: ${symptoms}, sốt: ${fever}, ăn uống: ${appetite}, ${days}, ${affectedCount}. Trả về JSON probableDiseases, urgentActions, recommendedMeds, warningNote.`;
 
   try {
+    const aiClient = getAi();
+    if (!aiClient) throw new Error('No AI client');
+
     const response = await withTimeout(
-      ai.models.generateContent({
+      aiClient.models.generateContent({
         model: 'gemini-3.8-flash',
         contents: prompt,
         config: {
