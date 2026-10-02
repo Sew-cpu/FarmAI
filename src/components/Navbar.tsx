@@ -36,7 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const pendingTasks = tasks.filter((t) => t.status === 'pending');
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-stone-200 shadow-xs">
+    <header className="sticky top-0 z-30 bg-white border-b border-stone-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Left: Mobile hamburger & Logo */}

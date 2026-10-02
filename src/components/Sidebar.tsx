@@ -120,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       {mobileOpen && (
         <div
           onClick={onCloseMobile}
-          className="fixed inset-0 z-40 bg-stone-900/50 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-stone-900/50 backdrop-blur-sm lg:hidden"
         />
       )}
 
@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         {/* Mobile Header with Close */}
         <div className="flex items-center justify-between p-4 border-b border-stone-100 lg:hidden shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-sm">
               <PawPrint className="w-4 h-4" />
             </div>
             <div>
@@ -209,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         {/* Compact AI Quick Card */}
         <div className="p-3 mx-3 mb-2 rounded-xl bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100/60 border border-emerald-200/80 shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-xs">
+            <div className="w-6 h-6 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-sm">
               <Sparkles className="w-3.5 h-3.5" />
             </div>
             <div className="min-w-0 flex-1">
