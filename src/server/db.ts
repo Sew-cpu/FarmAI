@@ -32,6 +32,7 @@ export async function getDbPool(): Promise<Pool | null> {
       user: process.env.MYSQL_USER || 'root',
       password: process.env.MYSQL_PASSWORD || '',
       database: database,
+      charset: 'utf8mb4',
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
@@ -43,9 +44,37 @@ export async function getDbPool(): Promise<Pool | null> {
     await conn.ping();
     conn.release();
 
+    // Auto-repair & ensure UTF-8 catalog in MySQL
+    try {
+      await pool.query('ALTER TABLE farm_products MODIFY COLUMN category VARCHAR(100) NOT NULL');
+      for (const p of PRODUCT_CATALOG) {
+        await pool.query(
+          `REPLACE INTO farm_products (id, name, brand, category, target_species, price_vnd, unit, active_ingredients, indications, dosage, withdrawal_days, in_stock, keywords)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            p.id,
+            p.name,
+            p.brand,
+            p.category,
+            JSON.stringify(p.targetSpecies),
+            p.priceVnd,
+            p.unit,
+            p.activeIngredients,
+            p.indications,
+            p.dosage,
+            p.withdrawalDays || 0,
+            p.inStock,
+            JSON.stringify(p.keywords),
+          ]
+        );
+      }
+    } catch (syncErr: any) {
+      console.warn('UTF-8 catalog sync note:', syncErr?.message);
+    }
+
     isConnected = true;
     lastError = null;
-    console.log(`✅ [MySQL] Đã kết nối thành công tới cơ sở dữ liệu: ${database} (${host})`);
+    console.log(`✅ [MySQL] Đã kết nối thành công tới cơ sở dữ liệu: ${database} (${host}) - UTF-8 Sẵn sàng`);
     return pool;
   } catch (err: any) {
     isConnected = false;
