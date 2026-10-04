@@ -5,6 +5,8 @@
 CREATE DATABASE IF NOT EXISTS `farmpro_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `farmpro_db`;
 
+SET FOREIGN_KEY_CHECKS = 0;
+
 -- 1. Bảng Danh Mục Sản Phẩm & Thuốc Thú Y (Dành cho Multi-Agent System TC01-TC10)
 DROP TABLE IF EXISTS `farm_products`;
 CREATE TABLE `farm_products` (
@@ -106,3 +108,6 @@ CREATE TABLE `care_tasks` (
   `is_ai_generated` BOOLEAN DEFAULT FALSE,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
