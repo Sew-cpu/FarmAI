@@ -14,9 +14,11 @@ import {
   Info,
   Layers,
   ArrowRight,
+  FileCode2,
 } from 'lucide-react';
 import { useFarm } from '../context/FarmContext';
 import { MultiAgentView } from './MultiAgentView';
+import { RequirementsAgentView } from './RequirementsAgentView';
 
 export const AiAdvisorView: React.FC = () => {
   const {
@@ -32,7 +34,7 @@ export const AiAdvisorView: React.FC = () => {
     setAiPromptPrefill,
   } = useFarm();
 
-  const [activeSubTab, setActiveSubTab] = useState<'chat' | 'multi-agent' | 'scheduler' | 'diagnose'>('chat');
+  const [activeSubTab, setActiveSubTab] = useState<'chat' | 'multi-agent' | 'requirements-agent' | 'scheduler' | 'diagnose'>('chat');
 
   // Chat state
   const [chatMode, setChatMode] = useState<'multi-agent' | 'clinical'>('clinical');
@@ -442,6 +444,21 @@ export const AiAdvisorView: React.FC = () => {
             </button>
 
             <button
+              onClick={() => setActiveSubTab('requirements-agent')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                activeSubTab === 'requirements-agent'
+                  ? 'bg-white text-indigo-950 shadow-md ring-2 ring-indigo-300'
+                  : 'bg-emerald-500/30 text-white hover:bg-emerald-500/40 border border-emerald-400/30'
+              }`}
+            >
+              <FileCode2 className="w-4 h-4 text-indigo-300" />
+              <span>Requirements Agent (Phân Rã SDLC)</span>
+              <span className="px-1.5 py-0.2 text-[10px] bg-indigo-400 text-indigo-950 font-extrabold rounded-md">
+                BA & Architect
+              </span>
+            </button>
+
+            <button
               onClick={() => setActiveSubTab('scheduler')}
               className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
                 activeSubTab === 'scheduler'
@@ -802,6 +819,9 @@ export const AiAdvisorView: React.FC = () => {
 
       {/* Sub Tab 2: Multi-Agent System (Hệ Thống Đa Tác Tử) */}
       {activeSubTab === 'multi-agent' && <MultiAgentView />}
+
+      {/* Sub Tab: Requirements Agent (AI BA & System Architect - SDLC) */}
+      {activeSubTab === 'requirements-agent' && <RequirementsAgentView />}
 
       {/* Sub Tab 3: AI Schedule Generator */}
       {activeSubTab === 'scheduler' && (

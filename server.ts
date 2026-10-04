@@ -18,6 +18,7 @@ import {
   runSingleTestCase,
 } from './src/server/multiAgentTestCases.ts';
 import { checkDbConnection, fetchAllProducts } from './src/server/db.ts';
+import { runRequirementsAgent } from './src/server/requirementsAgent.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -175,6 +176,22 @@ app.post('/api/ai/multi-agent/run-all-tests', async (_req: Request, res: Respons
   } catch (error: any) {
     console.error('Error running all test cases:', error);
     return res.status(500).json({ error: error.message || 'Lỗi chạy bộ kiểm thử toàn diện' });
+  }
+});
+
+// 6. Requirements Agent (Senior BA & System Architect Analysis - SDLC)
+app.post('/api/ai/requirements-agent/analyze', async (req: Request, res: Response) => {
+  try {
+    const { requirement } = req.body;
+    if (!requirement || typeof requirement !== 'string' || !requirement.trim()) {
+      return res.status(400).json({ error: 'Nội dung yêu cầu requirement không được để trống' });
+    }
+
+    const result = await runRequirementsAgent(requirement.trim());
+    return res.json(result);
+  } catch (error: any) {
+    console.error('Error in /api/ai/requirements-agent/analyze:', error);
+    return res.status(500).json({ error: error.message || 'Lỗi xử lý Requirements Agent' });
   }
 });
 
