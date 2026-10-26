@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   PawPrint,
@@ -10,8 +10,9 @@ import {
   BarChart3,
   Sparkles,
   X,
+  ChevronLeft,
+  ChevronRight,
   ShieldCheck,
-  Activity,
 } from 'lucide-react';
 import { useFarm } from '../context/FarmContext';
 
@@ -22,8 +23,11 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) => {
   const { activeTab, setActiveTab, animals, tasks, inventory } = useFarm();
+  const [collapsed, setCollapsed] = useState(false);
 
-  const sickCount = animals.filter((a) => a.status === 'sick' || a.status === 'isolated').length;
+  const sickCount = animals.filter(
+    (a) => a.status === 'sick' || a.status === 'isolated' || a.status === 'monitoring'
+  ).length;
   const pendingTasksCount = tasks.filter((t) => t.status === 'pending').length;
   const lowStockCount = inventory.filter((i) => i.quantity <= i.minThreshold).length;
 
@@ -41,10 +45,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         },
         {
           id: 'ai-advisor',
-          label: 'Tư Vấn Thú Y (Bác Sĩ AI)',
+          label: 'Phòng Khám & Bác Sĩ AI',
           icon: Bot,
-          badge: 'Trợ lý AI',
-          badgeColor: 'bg-emerald-500 text-white font-bold',
+          badge: 'AI Smart',
+          badgeColor: 'bg-emerald-600 text-white font-extrabold',
           highlight: true,
         },
       ],
@@ -56,8 +60,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           id: 'animals',
           label: 'Quản lý đàn vật nuôi',
           icon: PawPrint,
-          badge: sickCount > 0 ? `${sickCount} ốm` : `${animals.length} con`,
-          badgeColor: sickCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-stone-100 text-stone-600',
+          badge: sickCount > 0 ? `${sickCount} theo dõi` : `${animals.length} con`,
+          badgeColor: sickCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700',
           highlight: false,
         },
         {
@@ -65,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           label: 'Lịch trình chăm sóc',
           icon: CalendarCheck,
           badge: pendingTasksCount > 0 ? `${pendingTasksCount}` : null,
-          badgeColor: 'bg-blue-100 text-blue-800',
+          badgeColor: 'bg-emerald-100 text-emerald-800',
           highlight: false,
         },
         {
@@ -86,12 +90,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           label: 'Kho thức ăn & Thuốc',
           icon: Package,
           badge: lowStockCount > 0 ? `${lowStockCount} cạn` : null,
-          badgeColor: 'bg-red-100 text-red-800',
+          badgeColor: 'bg-rose-100 text-rose-800 font-bold',
           highlight: false,
         },
         {
           id: 'health-logs',
-          label: 'Hồ sơ bệnh án & Thú y',
+          label: 'Hồ sơ bệnh án số',
           icon: FileHeart,
           badge: null,
           badgeColor: '',
@@ -120,80 +124,89 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
       {mobileOpen && (
         <div
           onClick={onCloseMobile}
-          className="fixed inset-0 z-40 bg-stone-900/50 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs lg:hidden transition-opacity"
         />
       )}
 
-      {/* Redesigned Sidebar Container */}
+      {/* Sidebar Container - Sticky on Desktop */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-stone-200 flex flex-col transition-transform duration-300 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:z-20 lg:translate-x-0 ${
-          mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 bg-white border-r border-slate-200/80 flex flex-col transition-all duration-300 ease-in-out lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:self-start lg:z-20 shrink-0 ${
+          mobileOpen ? 'translate-x-0 w-72' : '-translate-x-full lg:translate-x-0'
+        } ${collapsed ? 'lg:w-20' : 'lg:w-64'}`}
       >
-        {/* Mobile Header with Close */}
-        <div className="flex items-center justify-between p-4 border-b border-stone-100 lg:hidden shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-sm">
+        {/* Mobile Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-100 lg:hidden">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
               <PawPrint className="w-4 h-4" />
             </div>
-            <div>
-              <span className="font-bold text-stone-900 text-sm">FarmPro AI</span>
-              <span className="block text-[10px] text-stone-500">Quản Lý Trang Trại</span>
-            </div>
+            <span className="font-extrabold text-base text-slate-900">FarmPro AI</span>
           </div>
           <button
             onClick={onCloseMobile}
-            className="p-1.5 rounded-lg text-stone-500 hover:bg-stone-100 focus:outline-none"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+            aria-label="Đóng thanh điều hướng"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Scrollable Navigation Area */}
-        <div className="flex-1 py-3 px-3 space-y-4 overflow-y-auto">
-          {navSections.map((section, sIdx) => (
-            <div key={sIdx} className="space-y-1">
-              <div className="px-3 pb-1 text-[10px] font-bold text-stone-400 tracking-wider">
-                {section.title}
-              </div>
+        {/* Desktop Collapse Toggle */}
+        <div className="hidden lg:flex items-center justify-end px-3 py-2 border-b border-slate-100/80">
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            title={collapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'}
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Navigation List */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+          {navSections.map((section, idx) => (
+            <div key={idx} className="space-y-1">
+              {!collapsed && (
+                <p className="px-3 text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1">
+                  {section.title}
+                </p>
+              )}
 
               {section.items.map((item) => {
-                const Icon = item.icon;
                 const isActive = activeTab === item.id;
+                const IconComponent = item.icon;
 
                 return (
                   <button
                     key={item.id}
                     onClick={() => handleSelectTab(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                    title={collapsed ? item.label : undefined}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-semibold transition-all group ${
                       isActive
                         ? item.highlight
                           ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-700/20'
-                          : 'bg-emerald-50 text-emerald-800 font-semibold'
-                        : item.highlight
-                        ? 'text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100/70 font-semibold border border-emerald-200/80'
-                        : 'text-stone-700 hover:bg-stone-100 hover:text-stone-900'
+                          : 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200/80 shadow-2xs'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon
-                        className={`w-4 h-4 shrink-0 ${
-                          isActive
-                            ? item.highlight
-                              ? 'text-white'
-                              : 'text-emerald-700'
-                            : item.highlight
-                            ? 'text-emerald-600'
-                            : 'text-stone-500'
-                        }`}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </div>
+                    <IconComponent
+                      className={`w-4 h-4 shrink-0 transition-transform ${
+                        isActive
+                          ? item.highlight
+                            ? 'text-white'
+                            : 'text-emerald-700'
+                          : 'text-slate-500 group-hover:scale-110 group-hover:text-slate-800'
+                      }`}
+                    />
 
-                    {item.badge && (
+                    {!collapsed && (
+                      <span className="flex-1 text-left truncate tracking-tight">{item.label}</span>
+                    )}
+
+                    {!collapsed && item.badge && (
                       <span
-                        className={`px-2 py-0.5 text-[10px] rounded-full shrink-0 font-medium ${
-                          isActive && item.highlight ? 'bg-white/20 text-white' : item.badgeColor
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                          item.badgeColor || (isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600')
                         }`}
                       >
                         {item.badge}
@@ -206,39 +219,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
           ))}
         </div>
 
-        {/* Compact AI Quick Card */}
-        <div className="p-3 mx-3 mb-2 rounded-xl bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100/60 border border-emerald-200/80 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-sm">
-              <Sparkles className="w-3.5 h-3.5" />
+        {/* Bottom Biosafety Status Badge */}
+        {!collapsed && (
+          <div className="p-3 m-3 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/60 text-xs space-y-1.5">
+            <div className="flex items-center gap-2 text-emerald-900 font-bold">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>An toàn sinh học</span>
             </div>
-            <div className="min-w-0 flex-1">
-              <h5 className="text-[11px] font-bold text-emerald-950 truncate">Bác Sĩ Thú Y AI</h5>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] text-emerald-700 font-medium">Sẵn sàng 24/7</span>
-              </div>
-            </div>
+            <p className="text-[11px] text-emerald-800 leading-snug">
+              Trang trại duy trì quy trình kiểm soát dịch tễ chuẩn VietGAHP.
+            </p>
           </div>
-          <button
-            onClick={() => handleSelectTab('ai-advisor')}
-            className="mt-2 w-full py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            Hỏi Tư Vấn Ngay
-          </button>
-        </div>
-
-        {/* Bottom Biosafety & Status Bar */}
-        <div className="px-3.5 py-2.5 border-t border-stone-100 bg-stone-50/50 flex items-center justify-between text-[11px] text-stone-500 shrink-0">
-          <span className="flex items-center gap-1.5 font-medium">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            VietGAP
-          </span>
-          <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/50">
-            <Activity className="w-2.5 h-2.5 text-emerald-600" />
-            Vận hành tốt
-          </span>
-        </div>
+        )}
       </aside>
     </>
   );

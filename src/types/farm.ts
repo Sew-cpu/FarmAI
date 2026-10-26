@@ -92,3 +92,50 @@ export interface ProductionStat {
   eggCount: number;
   feedConsumedKg: number;
 }
+
+// Structured Clinical AI Diagnosis Result
+export interface DiagnosisResult {
+  urgencyLevel: 'Khẩn cấp' | 'Trung bình' | 'Thấp' | 'Cần theo dõi' | 'KHẨN CẤP' | 'CẦN THEO DÕI' | string;
+  contagionRisk: 'Cao' | 'Trung bình' | 'Thấp' | string;
+  primarySuspicion: string;
+  differentialDiagnoses: {
+    diseaseName: string;
+    probability: string; // e.g. "75%"
+    clinicalRationale: string;
+    contagious: boolean;
+  }[];
+  immediateActions24h: string[];
+  isolationRequired: boolean;
+  isolationGuidance?: string;
+  treatmentProtocol: string;
+  recommendedMeds: {
+    name: string;
+    brand?: string;
+    activeIngredient?: string;
+    dosage: string;
+    withdrawalDays?: number;
+    estimatedPrice?: string;
+  }[];
+  nutritionAndBiosecurity?: string;
+  veterinaryNotes?: string;
+}
+
+// Global Toast Notification interface
+export interface ToastNotification {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  message: string;
+  duration?: number;
+}
+
+// Server & Database Health Status
+export interface ServerStatus {
+  connected: boolean;
+  host: string;
+  database: string;
+  mode: 'mysql_live' | 'in_memory_simulation' | 'offline';
+  message: string;
+  latencyMs?: number;
+}
+

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { FarmProvider, useFarm } from './context/FarmContext';
+import { ToastProvider } from './context/ToastContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { DashboardView } from './components/DashboardView';
 import { AnimalsView } from './components/AnimalsView';
 import { AiAdvisorView } from './components/AiAdvisorView';
@@ -15,13 +17,19 @@ import { AuthModal } from './components/AuthModal';
 import { UserProfileModal } from './components/UserProfileModal';
 
 function MainApp() {
-  const { activeTab } = useFarm();
+  const { activeTab, setActiveTab } = useFarm();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  const handleQuickAdd = () => {
+    setActiveTab('animals');
+    // AnimalsView will trigger modal via custom event or tab
+    window.dispatchEvent(new CustomEvent('farmpro-open-add-animal'));
+  };
+
   return (
-    <div className="min-h-screen bg-stone-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 pb-16 lg:pb-0">
       {/* Top Navigation */}
       <Navbar
         onOpenAuth={() => setIsAuthOpen(true)}
@@ -39,7 +47,7 @@ function MainApp() {
 
         {/* Dynamic Content View */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
-          {activeTab === 'dashboard' && <DashboardView />}
+          {activeTab === 'dashboard' && <DashboardView onOpenAddAnimal={handleQuickAdd} />}
           {activeTab === 'animals' && <AnimalsView />}
           {activeTab === 'multi-agent' && <MultiAgentView />}
           {activeTab === 'ai-advisor' && <AiAdvisorView />}
@@ -51,6 +59,9 @@ function MainApp() {
         </main>
       </div>
 
+      {/* Mobile Bottom Navigation Bar (< 1024px) */}
+      <MobileBottomNav onQuickAddAnimal={handleQuickAdd} />
+
       {/* Modals */}
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
       <UserProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
@@ -60,8 +71,10 @@ function MainApp() {
 
 export default function App() {
   return (
-    <FarmProvider>
-      <MainApp />
-    </FarmProvider>
+    <ToastProvider>
+      <FarmProvider>
+        <MainApp />
+      </FarmProvider>
+    </ToastProvider>
   );
 }

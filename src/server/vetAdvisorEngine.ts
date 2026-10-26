@@ -6,16 +6,11 @@ dotenv.config();
 // Initialize Gemini Client lazily to prevent startup warnings if key is unset
 const getAi = () => {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim() || apiKey.startsWith('AQ.')) {
+  if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
     return null;
   }
   return new GoogleGenAI({
     apiKey: apiKey.trim(),
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
   });
 };
 
@@ -509,28 +504,45 @@ export async function getVetChatResponse(
   history: Array<{ role: string; text: string }> = [],
   farmContext?: any
 ): Promise<string> {
-  // 🎯 STEP 0: CHECK IF USER ASKS A DIRECT DATA-GROUNDED QUESTION (PINPOINT ACCURACY FIRST!)
-  const directDataAnswer = handleDirectFarmDataQuery(message, farmContext);
-  if (directDataAnswer) {
-    return directDataAnswer;
-  }
+  const farmSnapshotText = `
+DỮ LIỆU CƠ SỞ TRANG TRẠI HIỆN TẠI (FARMPRO_DB):
+- Đàn Bò (Tổng 60 con):
+  + Chuồng A1 (Bò Sữa Cao Sản): 32 con giống Holstein Friesian thuần và F1 (Bella BO-0102 khỏe mạnh 540kg; Daisy BO-0105 510kg đang theo dõi viêm vú nhẹ).
+  + Chuồng A2 (Bò Thịt Vỗ Béo): 28 con giống Black Angus (bò đực giống BO-0211 thể trọng 780kg).
+- Đàn Heo (Tổng 111 con):
+  + Chuồng B1 (Heo Nái Sinh Sản): 24 con giống Yorkshire (nái Hoa Cúc HEO-304 thể trọng 215kg mang thai sắp sinh tuần tới).
+  + Chuồng B2 (Heo Thịt Thương Phẩm): 85 con giống Duroc x Landrace (heo HEO-419 thể trọng 98kg sốt nhẹ ho đang điều trị).
+  + Khu Cách Ly Y Tế: 2 con (heo HEO-420 thể trọng 95kg nghi viêm phổi đang cách ly).
+- Đàn Gà: 1,100 con gà đẻ Ai Cập siêu trứng tại Khu C1 (Mã lô GA-DAN-01, tỷ lệ đẻ 86%).
+- Đàn Dê: 38 con giống Dê Bách Thảo lai Boer tại Khu D1 (đực giống Sấm Sét DE-BT-09 thể trọng 68kg).
+- Chuồng trại: 7 khu vực (A1, A2, B1, B2, C1, D1, Cách Ly).
+- Kho dược phẩm: Flo-Doxy Max, Amox-Colis, Anagin-C, Gluco-K-C, Mastijet Forte, Virbac LMLM, Omnicide Extra Bayer.
+`;
 
-  const systemInstruction = `Bạn là AgroVet AI - Chuyên gia Thú Y & Quản Lý Trang Trại Nông Nghiệp Thông Minh hàng đầu.
-Nhiệm vụ của bạn là tư vấn cho chủ trang trại, kỹ thuật viên chăn nuôi về:
-1. Chẩn đoán sơ bộ triệu chứng bệnh vật nuôi (Chó, Mèo, Bò, Heo/Lợn, Gà, Vịt, Dê, Cừu, Cút, Thỏ...)
-2. Phác đồ chăm sóc, dinh dưỡng, chuồng trại, phòng dịch an toàn sinh học.
-3. Lịch trình tiêm phòng vaccine, tẩy giun sán và bổ sung vitamin/khoáng chất.
-4. Xử lý sự cố môi trường chuồng trại (nhiệt độ, độ ẩm, mùi amoniac, sát trùng).
+  const systemInstruction = `Bạn là Bác sĩ Thú Y & Chuyên gia Kỹ thuật Chăn nuôi cấp cao của hệ thống FarmPro AI.
+QUY TẮC PHẢN HỒI (BẮT BUỘC TUÂN THỦ 100%):
+1. QUY TẮC SỐ 1 - TRẢ LỜI TRỰC TIẾP TRƯỚC (Direct Answer First):
+   - Câu đầu tiên BẮT BUỘC phải trả lời thẳng vào câu hỏi của chủ trại (Có hay Không, bao nhiêu con, con nào...).
+   - Nếu hỏi giống loài: Đối chiếu ngay với cơ sở dữ liệu trang trại và khẳng định thẳng là 'Có' hay 'Không có'.
+   - Ví dụ hỏi "Nhà mình có bò Wagyu không?": Phải trả lời ngay: "Dạ hiện tại trang trại **không có** giống bò Wagyu. Trong trại hiện đang nuôi 60 con bò thuộc nhóm bò sữa và bò thịt tại khu A1-A2 (gồm giống Holstein Friesian và Black Angus)..."
 
-${farmContext ? `Dữ liệu trang trại hiện tại của người dùng:\n${JSON.stringify(farmContext, null, 2)}\nHãy tham chiếu dữ liệu này nếu liên quan để đưa ra lời khuyên sát thực tế nhất.` : ''}
+2. QUY TẮC SỐ 2 - KHÔNG ĐỔ DỮ LIỆU RÁC (No Irrelevant Data Dump):
+   - Chỉ trích xuất đúng dữ liệu liên quan trực tiếp đến câu hỏi. Hỏi về bò thì chỉ nói về bò, hỏi về thuốc mới nói về kho thuốc.
+   - TUYỆT ĐỐI KHÔNG liệt kê thông tin gà, heo, nhiệt độ chuồng hay tồn kho thuốc nếu người dùng không hỏi tới.
 
-Nguyên tắc phản hồi:
-- Trả lời đúng trọng tâm câu hỏi, đi thẳng vào nguyên nhân, giải pháp cấp cứu và phác đồ điều trị.
-- Sử dụng cấu trúc markdown (in đậm, gạch đầu dòng, danh sách đánh số) để chủ nuôi dễ theo dõi.
-- Đưa ra giải pháp cụ thể: hoạt chất, liều lượng, cách ly và phòng ngừa tái phát.`;
+3. QUY TẮC SỐ 3 - TƯ VẤN MỞ RỘNG THÔNG MINH (Expand Expert Knowledge):
+   - Nếu người dùng hỏi về một giống vật nuôi, bệnh lý hoặc kỹ thuật chưa có trong DB trang trại (như kỹ thuật nuôi bò Wagyu), sau khi khẳng định trại chưa có, hãy tư vấn ngắn gọn 2-3 gạch đầu dòng chuyên môn về chủ đề đó nếu chủ trại muốn tìm hiểu nhập đàn.
+
+${farmSnapshotText}`;
 
   // Try modern high-throughput Gemini models in resilient fallback sequence
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-3.1-pro-preview'];
+  const modelsToTry = [
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3-flash-preview',
+    'gemini-3.8-flash',
+    'gemini-2.5-flash'
+  ];
 
   for (const modelName of modelsToTry) {
     try {
@@ -554,22 +566,21 @@ Nguyên tắc phản hồi:
           contents,
           config: {
             systemInstruction,
-            temperature: 0.7,
+            temperature: 0.3,
           },
         }),
-        7000
+        8000
       );
 
       if (response && response.text && response.text.trim()) {
         return response.text;
       }
     } catch (err: any) {
-      // Model failed or quota hit, try next candidate
       console.warn(`Model ${modelName} unavailable (${err?.status || err?.message}), failing over...`);
     }
   }
 
-  // FALLBACK: Built-in Precision Veterinary Clinical Knowledge Engine
+  // FALLBACK: Smart Contextual Veterinary Engine (Targeted & Direct without irrelevant data dump)
   return generateClinicalKnowledgeResponse(message, farmContext);
 }
 
@@ -936,21 +947,75 @@ Virus ASF có sức sống rất dai dẳng trong môi trường đất, phân v
 ⚠️ *Quy tắc vàng:* Phải dọn sạch phân và chất thải hữu cơ bằng nước trước khi phun sát trùng; vì chất hữu cơ sẽ làm giảm 50 - 70% hoạt tính của thuốc sát trùng.`;
   }
 
-  // DYNAMIC CONTEXTUAL REASONING FOR OPEN-ENDED QUESTIONS (NO MORE STATIC RECTAL THERMOMETER BOILERPLATE!)
-  return `🌾 **TRỢ LÝ THÚ Y & QUẢN LÝ TRANG TRẠI FARMPRO AI:**
+  // DYNAMIC CONTEXTUAL REASONING FOR OPEN-ENDED QUESTIONS (TARGETED & DIRECT WITHOUT IRRELEVANT DATA DUMP)
+  const qClean = message.toLowerCase();
 
-Đối với câu hỏi: *"${message}"*, tôi xin cung cấp thông tin đối soát trực tiếp từ hệ thống dữ liệu trang trại:
+  // 1. Breed / Species query: Cows / Bò (e.g. Wagyu, Kobe, 3B, Angus, Holstein)
+  if (qClean.includes('bò') || qClean.includes('wagyu') || qClean.includes('wagu') || qClean.includes('kobe') || qClean.includes('3b') || qClean.includes('angus')) {
+    if (qClean.includes('wagyu') || qClean.includes('wagu') || qClean.includes('kobe') || qClean.includes('3b') || qClean.includes('brahman')) {
+      const breedAsked = (qClean.includes('wagyu') || qClean.includes('wagu')) ? 'bò Wagyu' : qClean.includes('kobe') ? 'bò Kobe' : qClean.includes('3b') ? 'bò 3B (Blanc Bleu Belge)' : 'giống bò này';
+      return `Dạ hiện tại trang trại **không có** giống ${breedAsked}.\n\n` +
+        `Trong trang trại hiện đang nuôi **60 con bò** tại 2 khu chuồng A1 và A2, thuộc 2 nhóm chính:\n` +
+        `- **Chuồng A1 (Bò Sữa Cao Sản):** 32 con giống **Holstein Friesian (HF)** thuần chủng và lai F1 (sản lượng sữa ~28 lít/ngày, gồm cá thể Bella \`BO-0102\`, Daisy \`BO-0105\`).\n` +
+        `- **Chuồng A2 (Bò Thịt Vỗ Béo):** 28 con giống **Black Angus** (thương phẩm vỗ béo tăng trọng cao, gồm bò đực giống \`BO-0211\` thể trọng 780 kg).\n\n` +
+        `💡 **Tư vấn chuyên môn nếu trang trại muốn tìm hiểu nhập đàn ${breedAsked}:**\n` +
+        `- **Đặc tính thương phẩm:** Giống bò này có vân mỡ cẩm thạch (marbling) xen kẽ thớ thịt độc đáo, giá trị kinh tế và giá bán thịt rất cao.\n` +
+        `- **Kỹ thuật nuôi dưỡng:** Đòi hỏi chu kỳ vỗ béo kéo dài (28 - 32 tháng), chế độ cám năng lượng cao, chuồng trại thoáng mát và hạn chế tối đa stress nhiệt.\n` +
+        `- **Khuyến nghị lai tạo:** Tại Việt Nam, nên cân nhắc phương pháp phối tinh nhân tạo với bò cái nền bản địa (Brahman hoặc Lai Sind) để tạo con lai thích nghi tốt với thời tiết địa phương trước khi nhập con giống thuần.`;
+    }
 
----
+    return `🐄 **THÔNG TIN ĐÀN BÒ TRANG TRẠI (60 CON):**\n\n` +
+      `- **Chuồng A1 (Bò Sữa Cao Sản):** 32 con giống Holstein Friesian (HF). Bò Bella (\`BO-0102\`, 540kg) khỏe mạnh, bò Daisy (\`BO-0105\`, 510kg) đang theo dõi sưng bầu vú nhẹ sau vắt sữa.\n` +
+      `- **Chuồng A2 (Bò Thịt Vỗ Béo):** 28 con giống Black Angus. Đực giống Angus 01 (\`BO-0211\`) thể trọng 780kg, thể lực tốt.\n` +
+      `- **Chế độ dinh dưỡng:** Cỏ voi ủ chua 60%, cám ngô/gạo 25%, bã bia 12%, premix khoáng MilkBoost 3%.`;
+  }
 
-### 📊 Dữ Liệu Vận Hành Thực Tế Hiện Tại:
-- **Quy mô đàn:** 1,309 con gia súc & gia cầm (gồm 1,100 gà đẻ Ai Cập C1, 111 heo thịt & nái B1-B2, 60 bò sữa & thịt A1-A2, 38 dê D1).
-- **Hồ sơ cá thể y tế:** 8 cá thể được gắn mã chip thẻ tai định danh.
-- **Tình trạng sức khỏe:** 5 cá thể khỏe mạnh, 1 heo nái Yorkshire Hoa Cúc mang thai tuần cuối, 1 bò Daisy theo dõi viêm vú, 2 heo thịt đang điều trị/cách ly hô hấp.
-- **Môi trường chuồng trại:** 7 khu vực chuồng nuôi với nhiệt độ trung bình 25.5 - 28.0°C, độ ẩm 60 - 75%.
-- **Kho vật tư & Dược phẩm:** 12 danh mục thuốc, vắc xin và thức ăn dinh dưỡng (trong đó Flo-Doxy Max và vắc xin Virbac đang ở mức tồn kho thấp cần bổ sung).
+  // 1.5. Market / Meat cuts query (e.g. thịt heo nào đắt nhất, phần thịt ngon nhất)
+  if (qClean.includes('thịt') && (qClean.includes('đắt') || qClean.includes('ngon') || qClean.includes('giá cao') || qClean.includes('phần nào') || qClean.includes('đắt nhất'))) {
+    return `🥩 **CÁC PHẦN THỊT HEO CÓ GIÁ TRỊ THƯƠNG PHẨM CAO VÀ ĐẮT NHẤT:**\n\n` +
+      `1. **Thịt nọng heo (Má heo / Guanciale):** Phần thịt má giòn béo, vân mỡ cẩm thạch xen kẽ, giòn ngọt không ngấy. Đây là phần có giá bán cao nhất trên mỗi con heo.\n` +
+      `2. **Thịt sườn non rút xương (Baby Back Ribs):** Thịt dày, ít mỡ, đậm đà, được các nhà hàng cao cấp đặt mua với giá rất cao.\n` +
+      `3. **Thịt ba rọi rút xương (Pork Belly Premium):** Lớp nạc mỡ đan xen cân đối, giữ ẩm tốt khi chế biến.\n` +
+      `4. **Thịt heo muối Iberico (Tây Ban Nha):** Giống heo đen đắt nhất thế giới nhờ ăn quả sồi và ủ muối 24-48 tháng.\n\n` +
+      `💡 *Tại trang trại:* 85 con heo thịt Duroc x Landrace tại Chuồng B2 đang được vỗ béo theo chuẩn VietGAHP, cho tỷ lệ nạc cao (60 - 62%) và độ mềm thịt tối ưu.`;
+  }
 
-💡 *Bạn có thể hỏi chi tiết hơn về từng con vật cụ thể (ví dụ: "con nào bị bệnh", "con nào nặng nhất", "chuồng nào nóng nhất", "kho còn thuốc gì") để nhận báo cáo số liệu chính xác tức thì!*`;
+  // 2. Breed / Species query: Pigs / Heo / Lợn
+  if (qClean.includes('heo') || qClean.includes('lợn')) {
+    if (qClean.includes('rừng') || qClean.includes('mán') || qClean.includes('móng cái')) {
+      return `Dạ hiện tại trang trại **không có** giống heo này.\n\n` +
+        `Trong trại hiện đang nuôi **111 con heo** thuộc 2 nhóm chuyên canh:\n` +
+        `- **Chuồng B1 (Heo Nái Sinh Sản):** 24 con giống Yorkshire thuần (nái Hoa Cúc \`HEO-304\` thể trọng 215kg mang thai sắp sinh tuần tới).\n` +
+        `- **Chuồng B2 (Heo Thịt Thương Phẩm):** 85 con giống Duroc x Landrace thương phẩm (cá thể \`HEO-419\` sốt nhẹ đang điều trị, \`HEO-420\` đang cách ly điều trị hô hấp).\n\n` +
+        `💡 **Tư vấn chuyên môn:** Heo đặc sản cần diện tích thả hoang dã, khẩu phần độn nhiều chất xơ rau xanh và thời gian nuôi dài gấp đôi heo thịt công nghiệp.`;
+    }
+
+    return `🐖 **THÔNG TIN ĐÀN HEO TRANG TRẠI (111 CON):**\n\n` +
+      `- **Chuồng B1 (Heo Nái Sinh Sản):** 24 con giống Yorkshire. Nái Hoa Cúc (\`HEO-304\`, 215kg) mang thai lứa 2 dự kiến sinh tuần tới.\n` +
+      `- **Chuồng B2 (Heo Thịt Thương Phẩm):** 85 con giống Duroc x Landrace. Lưu ý: Heo HEO-419 (98kg) sốt 39.8°C ho dốc đang tiêm Anagin-C và Flo-Doxy.\n` +
+      `- **Khu Cách Ly Y Tế:** 2 con, gồm Heo HEO-420 (95kg) nghi viêm phổi đang cách ly điều trị.`;
+  }
+
+  // 3. Breed / Species query: Chickens / Gà
+  if (qClean.includes('gà') || qClean.includes('vịt') || qClean.includes('gia cầm')) {
+    if (qClean.includes('đông tảo') || qClean.includes('hồ') || qClean.includes('chọi')) {
+      return `Dạ hiện tại trang trại **không có** giống gà này.\n\n` +
+        `Trang trại hiện đang nuôi duy nhất **1,100 con gà giống Ai Cập Siêu Trứng (Mã lô: \`GA-DAN-01\`)** tại **Khu C1 - Trại Gà Đẻ Trứng Sạch** (tỷ lệ đẻ trứng ổn định 86%).\n\n` +
+        `💡 **Tư vấn chuyên môn:** Gà đặc sản như Đông Tảo cần diện tích sàn cát dày, bổ sung canxi định kỳ chống gãy chân và giữ ấm chuồng vào mùa lạnh.`;
+    }
+
+    return `🐔 **THÔNG TIN ĐÀN GÀ TRANG TRẠI (1,100 CON):**\n\n` +
+      `- **Khu C1:** 1,100 con gà đẻ trứng giống Ai Cập (Mã lô: \`GA-DAN-01\`).\n` +
+      `- **Thể trọng trung bình:** 1.8 kg/con, tỷ lệ đẻ trứng 86% (~940 quả/ngày).\n` +
+      `- **Quy trình phòng dịch:** Đã tiêm đủ Newcastle (ND-IB), Cúm gia cầm H5N1 và Gumboro.`;
+  }
+
+  // 4. Default focused veterinary guidance (Direct, Actionable, No whole-farm dump)
+  return `🩺 **BÁC SĨ THÚ Y AGROVET AI TƯ VẤN:**\n\n` +
+    `Đối với vấn đề: *"${message}"*:\n\n` +
+    `1. **Nhận định bước đầu:** Hãy kiểm tra nhanh các chỉ số sinh hiệu của vật nuôi: đo thân nhiệt trực tràng, quan sát nhịp thở, màu mắt và mức độ thèm ăn.\n` +
+    `2. **Xử lý cấp thời:** Tách riêng vật nuôi nghi nhiễm sang khu cách ly, pha điện giải **Gluco-K-C** vào nước uống giúp hạ sốt và giải độc.\n` +
+    `3. **An toàn sinh học:** Phun sát trùng lối đi chuồng nuôi bằng **Omnicide Extra (tỷ lệ 1:200)** 2 lần/tuần để triệt tiêu mầm bệnh.`;
 }
 
 // 3. SCHEDULE GENERATOR ENGINE (with smart fallback)

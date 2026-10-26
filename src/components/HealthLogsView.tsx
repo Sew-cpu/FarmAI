@@ -13,10 +13,12 @@ import {
   User,
 } from 'lucide-react';
 import { useFarm } from '../context/FarmContext';
+import { useToast } from '../context/ToastContext';
 import { HealthLog } from '../types/farm';
 
 export const HealthLogsView: React.FC = () => {
   const { healthLogs, animals, addHealthLog, updateHealthLog, setActiveTab, setAiPromptPrefill } = useFarm();
+  const { success } = useToast();
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,6 +64,7 @@ export const HealthLogsView: React.FC = () => {
       notes,
     });
 
+    success('Ghi nhận ca bệnh thành công', `Đã lưu hồ sơ bệnh án cho ${animal.name} (${animal.tagId}).`);
     setIsAddModalOpen(false);
   };
 

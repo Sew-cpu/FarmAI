@@ -65,16 +65,11 @@ const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
 // Initialize Gemini Client
 const getAiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim() || apiKey.startsWith('AQ.')) {
+  if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
     return null;
   }
   return new GoogleGenAI({
     apiKey: apiKey.trim(),
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
   });
 };
 

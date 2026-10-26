@@ -18,16 +18,23 @@ import {
   INITIAL_PRODUCTION_STATS,
 } from '../data/mockData';
 
+import { ServerStatus } from '../types/farm';
+
 interface FarmContextType {
   user: UserProfile | null;
   login: (userData: UserProfile) => void;
   logout: () => void;
   updateUser: (profile: Partial<UserProfile>) => void;
 
+  serverStatus: ServerStatus;
+  checkServerConnection: () => Promise<void>;
+
   animals: Animal[];
-  addAnimal: (animal: Omit<Animal, 'id'>) => void;
-  updateAnimal: (id: string, animal: Partial<Animal>) => void;
-  deleteAnimal: (id: string) => void;
+  isLoadingAnimals: boolean;
+  loadAnimalsFromApi: () => Promise<void>;
+  addAnimal: (animal: Omit<Animal, 'id'>) => Promise<boolean>;
+  updateAnimal: (id: string, animal: Partial<Animal>) => Promise<boolean>;
+  deleteAnimal: (id: string) => Promise<boolean>;
 
   barns: Barn[];
   addBarn: (barn: Omit<Barn, 'id'>) => void;
@@ -61,12 +68,72 @@ interface FarmContextType {
   aiPromptPrefill: string;
   setAiPromptPrefill: (prompt: string) => void;
 
+  diagnosisTargetAnimal: Animal | null;
+  setDiagnosisTargetAnimal: (animal: Animal | null) => void;
+
+  selectedAnimalForDiagnosis: Animal | null;
+  setSelectedAnimalForDiagnosis: (animal: Animal | null) => void;
+
   quickDiagnoseAnimal: (animal: Animal) => void;
 }
 
 const FarmContext = createContext<FarmContextType | undefined>(undefined);
 
 export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [serverStatus, setServerStatus] = useState<ServerStatus>({
+    connected: false,
+    host: 'localhost',
+    database: 'farmpro_db',
+    mode: 'in_memory_simulation',
+    message: 'Đang kiểm tra kết nối...',
+  });
+  const [isLoadingAnimals, setIsLoadingAnimals] = useState<boolean>(false);
+
+  const checkServerConnection = async () => {
+    const startTime = performance.now();
+    try {
+      const res = await fetch('/api/db/status', { signal: AbortSignal.timeout(4000) });
+      const latencyMs = Math.round(performance.now() - startTime);
+      if (res.ok) {
+        const data = await res.json();
+        setServerStatus({
+          connected: !!data.connected,
+          host: data.host || 'localhost',
+          database: data.database || 'farmpro_db',
+          mode: data.connected ? 'mysql_live' : 'in_memory_simulation',
+          message: data.message || 'Kết nối bình thường',
+          latencyMs,
+        });
+      } else {
+        setServerStatus({
+          connected: false,
+          host: 'localhost',
+          database: 'farmpro_db',
+          mode: 'offline',
+          message: `Lỗi máy chủ (${res.status})`,
+          latencyMs,
+        });
+      }
+    } catch {
+      setServerStatus({
+        connected: false,
+        host: 'localhost',
+        database: 'farmpro_db',
+        mode: 'in_memory_simulation',
+        message: 'Chạy độc lập (In-Memory simulation)',
+        latencyMs: undefined,
+      });
+    }
+  };
+
+  useEffect(() => {
+    checkServerConnection();
+    const interval = setInterval(checkServerConnection, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const [diagnosisTargetAnimal, setDiagnosisTargetAnimal] = useState<Animal | null>(null);
+
   const [user, setUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('farmpro_user');
     return saved ? JSON.parse(saved) : INITIAL_USER;
@@ -158,12 +225,37 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser((prev) => (prev ? { ...prev, ...profile } : null));
   };
 
-  // Animal methods
-  const addAnimal = (animalData: Omit<Animal, 'id'>) => {
+  // Fetch animals from API with local fallback
+  const loadAnimalsFromApi = async () => {
+    setIsLoadingAnimals(true);
+    try {
+      const res = await fetch('/api/animals', { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.animals && Array.isArray(data.animals) && data.animals.length > 0) {
+          setAnimals(data.animals);
+        }
+      }
+    } catch {
+      // Offline fallback: keep existing animals from localStorage
+    } finally {
+      setIsLoadingAnimals(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAnimalsFromApi();
+  }, []);
+
+  // Animal methods (sync with API and LocalStorage)
+  const addAnimal = async (animalData: Omit<Animal, 'id'>): Promise<boolean> => {
+    const tempId = `an-${Date.now()}`;
     const newAnimal: Animal = {
       ...animalData,
-      id: `an-${Date.now()}`,
+      id: tempId,
     };
+
+    // Update local state immediately for snappy UX
     setAnimals((prev) => [newAnimal, ...prev]);
 
     // Update barn count
@@ -172,15 +264,46 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         prev.map((b) => (b.id === animalData.barnId ? { ...b, currentCount: b.currentCount + 1 } : b))
       );
     }
+
+    // Attempt backend sync
+    try {
+      const res = await fetch('/api/animals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(animalData),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (result.animal && result.animal.id) {
+          setAnimals((prev) =>
+            prev.map((a) => (a.id === tempId ? { ...a, id: result.animal.id } : a))
+          );
+        }
+      }
+      return true;
+    } catch {
+      return true; // Still saved in local state
+    }
   };
 
-  const updateAnimal = (id: string, updatedFields: Partial<Animal>) => {
+  const updateAnimal = async (id: string, updatedFields: Partial<Animal>): Promise<boolean> => {
     setAnimals((prev) =>
       prev.map((a) => (a.id === id ? { ...a, ...updatedFields } : a))
     );
+
+    try {
+      await fetch(`/api/animals/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedFields),
+      });
+      return true;
+    } catch {
+      return true;
+    }
   };
 
-  const deleteAnimal = (id: string) => {
+  const deleteAnimal = async (id: string): Promise<boolean> => {
     const animalToDelete = animals.find((a) => a.id === id);
     setAnimals((prev) => prev.filter((a) => a.id !== id));
 
@@ -192,6 +315,13 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
             : b
         )
       );
+    }
+
+    try {
+      await fetch(`/api/animals/${id}`, { method: 'DELETE' });
+      return true;
+    } catch {
+      return true;
     }
   };
 
@@ -319,6 +449,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Quick jump to AI with animal preloaded
   const quickDiagnoseAnimal = (animal: Animal) => {
+    setDiagnosisTargetAnimal(animal);
     const prompt = `Tôi cần bác sĩ thú y AI chẩn đoán và tư vấn cho vật nuôi sau:
 - Mã thẻ tai: ${animal.tagId}
 - Tên/Giống: ${animal.name} (${animal.breed})
@@ -340,6 +471,8 @@ Xin hãy đưa ra chẩn đoán nguyên nhân, phác đồ điều trị ban đ�
         login,
         logout,
         updateUser,
+        serverStatus,
+        checkServerConnection,
         animals,
         addAnimal,
         updateAnimal,
@@ -369,6 +502,12 @@ Xin hãy đưa ra chẩn đoán nguyên nhân, phác đồ điều trị ban đ�
         setActiveTab,
         aiPromptPrefill,
         setAiPromptPrefill,
+        diagnosisTargetAnimal,
+        setDiagnosisTargetAnimal,
+        selectedAnimalForDiagnosis: diagnosisTargetAnimal,
+        setSelectedAnimalForDiagnosis: setDiagnosisTargetAnimal,
+        isLoadingAnimals,
+        loadAnimalsFromApi,
         quickDiagnoseAnimal,
       }}
     >
