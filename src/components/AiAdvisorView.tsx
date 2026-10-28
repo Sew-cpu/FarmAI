@@ -25,6 +25,7 @@ import {
   ChevronRight,
   UserCheck,
   Database,
+  Trash2,
 } from 'lucide-react';
 import { useFarm } from '../context/FarmContext';
 import { useToast } from '../context/ToastContext';
@@ -581,8 +582,29 @@ ${diagnosisResult.recommendedMeds?.map((m) => `  * ${m.name} (${m.brand || 'Dư�
 
   // Send message to Chatbot (with multi-turn history)
   const handleSendMessage = async (textToSend?: string) => {
-    const query = textToSend || inputMessage;
-    if (!query.trim() || isLoadingChat) return;
+    const query = (textToSend || inputMessage).trim();
+    if (!query || isLoadingChat) return;
+
+    // Direct natural language command to clear chat history
+    const lowerQuery = query.toLowerCase();
+    const isClearCommand = [
+      'xoá lịch sử chat',
+      'xóa lịch sử chat',
+      'xoá lịch sử',
+      'xóa lịch sử',
+      'xoá chat',
+      'xóa chat',
+      'xóa tin nhắn',
+      'xoá tin nhắn',
+      'clear chat',
+      'reset chat',
+      'làm mới chat',
+    ].some((cmd) => lowerQuery === cmd || lowerQuery === `/${cmd}` || lowerQuery.startsWith('xóa lịch sử') || lowerQuery.startsWith('xoá lịch sử'));
+
+    if (isClearCommand) {
+      clearChatHistory();
+      return;
+    }
 
     const userMsg = {
       role: 'user' as const,
@@ -669,15 +691,16 @@ ${diagnosisResult.recommendedMeds?.map((m) => `  * ${m.name} (${m.brand || 'Dư�
     const initialGreeting = [
       {
         role: 'model' as const,
-        text: `👋 **Cuộc trò chuyện đã được làm mới.**\n\nTôi đã đồng bộ lại với dữ liệu thời gian thực từ cơ sở dữ liệu \`farmpro_db\`. Bạn hãy đặt câu hỏi hoặc chọn các câu hỏi gợi ý bên dưới để bắt đầu!`,
+        text: `👋 **Lịch sử trò chuyện đã được xóa sạch.**\n\nTôi đã làm mới ngữ cảnh và đồng bộ sẵn sàng với cơ sở dữ liệu \`farmpro_db\`. Bạn hãy đặt câu hỏi hoặc chọn các gợi ý bên dưới để bắt đầu cuộc trò chuyện mới!`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ];
     setMessages(initialGreeting);
+    setInputMessage('');
     try {
       localStorage.removeItem('farmpro_chat_history');
     } catch (e) {}
-    success('Làm mới cuộc trò chuyện', 'Lịch sử chat đã được xóa sạch.');
+    success('Đã xóa lịch sử chat', 'Toàn bộ cuộc trò chuyện đã được làm mới sạch sẽ.');
   };
 
   return (
@@ -1339,13 +1362,15 @@ ${diagnosisResult.recommendedMeds?.map((m) => `  * ${m.name} (${m.brand || 'Dư�
                 <span>Đã đồng bộ dữ liệu trang trại (<code className="font-mono text-[11px]">farmpro_db</code>)</span>
               </div>
 
-              {/* Clear Chat Button */}
+              {/* Clear Chat Button with clear text label */}
               <button
+                type="button"
                 onClick={clearChatHistory}
-                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors"
-                title="Làm mới hội thoại (Clear Chat)"
+                className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200/90 font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95"
+                title="Xóa toàn bộ lịch sử trò chuyện (Clear Chat)"
               >
-                <RotateCcw className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                <span>Xóa lịch sử chat</span>
               </button>
             </div>
           </div>
@@ -1467,8 +1492,19 @@ ${diagnosisResult.recommendedMeds?.map((m) => `  * ${m.name} (${m.brand || 'Dư�
                 e.preventDefault();
                 handleSendMessage();
               }}
-              className="flex items-center gap-3 max-w-4xl lg:max-w-5xl mx-auto"
+              className="flex items-center gap-2.5 sm:gap-3 max-w-4xl lg:max-w-5xl mx-auto"
             >
+              {/* Quick Clear Chat Button right on input bar */}
+              <button
+                type="button"
+                onClick={clearChatHistory}
+                className="min-h-[52px] px-3.5 sm:px-4 py-3 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 font-semibold rounded-2xl transition-all flex items-center gap-1.5 text-xs sm:text-sm active:scale-95 shrink-0 shadow-2xs"
+                title="Xóa toàn bộ lịch sử chat"
+              >
+                <Trash2 className="w-4 h-4 text-red-500 shrink-0" />
+                <span className="hidden sm:inline">Xóa lịch sử</span>
+              </button>
+
               <input
                 ref={chatInputRef}
                 type="text"
