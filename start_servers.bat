@@ -28,3 +28,4 @@ echo  - Giao diện: http://localhost:3000
 echo  - Backend:   http://localhost:5000
 echo ====================================================
 start http://localhost:3000
+

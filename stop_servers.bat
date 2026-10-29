@@ -13,3 +13,4 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3000 ^| findstr LISTENING') 
 
 echo Da dung tat ca dich vu FarmPro AI.
 pause
+
