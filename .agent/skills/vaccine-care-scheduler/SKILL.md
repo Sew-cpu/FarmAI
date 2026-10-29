@@ -142,3 +142,4 @@ Mỗi khi lập lịch vắc-xin, Skill luôn đính kèm hướng dẫn khẩn 
    - Tiêm ngay **Atropin Sulfate 0.1%** (1ml/15-20kg thể trọng) hoặc **Adrenaline 1‰** (1ml/50kg thể trọng).
    - Tiêm trợ tim **Cafein** (3 - 5ml tiêm bắp).
    - Kéo đầu vật nuôi lên cao để thông đường thở, chườm nước mát vào đầu và tai.
+
